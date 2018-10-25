@@ -38,11 +38,37 @@ var server = http.createServer(function(req, res){
 	req.on('end',function(){
 		payloadBuffer += decoder.end();
 
-			// Send the response
-	    res.end('Welcome!\n');
+		// Choose handler request should go to
+		var chosenhandler = typeof(router[trimmedPath]) !== 'undefined' ? router[trimmedPath] : handlers.notFound;
 
-		// Log the request path
-		console.log("Request received with this payload: ",payloadBuffer);
+		// Construct the data object to send to the handler
+		var data = {
+			'trimmedPath' : trimmedPath,
+			'queryStringObject' : queryStringObject,
+			'method' : method,
+			'headers' : headers,
+			'payload' : payloadBuffer
+		};
+
+		// Routh the request to the handler
+		chosenhandler(data, function(statusCode, payload){
+			// Use the status code called back by the handler, or default 200
+			statusCode = typeof(statusCode) == 'number' ? statusCode : 200;
+			// Use the payload called back by the handler, or default empty object
+			payload = typeof(payload) == 'object' ? payload : {};
+
+			// Conver payload returned by callback to a string
+			var payloadString = JSON.stringify(payload);
+
+			// Return the response
+			res.setHeader('Content-Type', 'application/json');
+			res.writeHead(statusCode);
+			res.end(payloadString);
+
+			// Log the request path
+		    console.log("Returning this response: ",statusCode, payloadString);
+		});
+
 	});
 
 });
@@ -51,3 +77,22 @@ var server = http.createServer(function(req, res){
 server.listen(3000, function(){
 	console.log("Server is listening on port 3000");
 });
+
+// Define the handlers
+var handlers = {};
+
+// Sampler handler
+handlers.sample = function(data, callback){
+	// Callback a http status code, and a payload object
+	callback(406,{'name' : 'sample handler'});
+};
+
+// Not found handler
+handlers.notFound = function(data, callback){
+	callback(404);
+};
+
+// Define a request router
+var router = {
+	'sample' : handlers.sample
+};
